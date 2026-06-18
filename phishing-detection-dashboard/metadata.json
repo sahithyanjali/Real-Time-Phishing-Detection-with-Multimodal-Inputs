@@ -1,0 +1,10 @@
+{
+  "name": "Phishing Detection Dashboard",
+  "description": "Real-time AI-powered phishing and threat scanner for emails, websites, URLs, and screenshots using multimodal deep learning.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
