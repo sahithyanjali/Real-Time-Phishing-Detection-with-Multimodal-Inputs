@@ -58,7 +58,7 @@ export default function ThreatTrendChart({ history }: ThreatTrendChartProps) {
           // If outer scan, we can either append or ignore (constrain to last 7 days)
         }
       } catch (err) {
-        // Fallback for custom or weird timestamps
+        console.warn("ThreatTrendChart: Failed to parse history item timestamp:", item.timestamp, err);
       }
     });
 
