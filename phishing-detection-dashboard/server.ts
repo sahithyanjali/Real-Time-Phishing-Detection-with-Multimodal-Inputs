@@ -10,7 +10,7 @@ dotenv.config();
 const PORT = 3000;
 
 // Unified helper to query Gemini with retry behavior and fallback models on 503/UNAVAILABLE errors
-async function generateWithRetryAndFallback(ai: GoogleGenAI, contents: any, config: any) {
+export async function generateWithRetryAndFallback(ai: GoogleGenAI, contents: any, config: any) {
   // Ordered fallback models. 'gemini-2.5-flash' and 'gemini-1.5-flash' have exceptional high availability
   const modelsToTry = ["gemini-2.5-flash", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-1.5-flash"];
   let lastError: any = null;
