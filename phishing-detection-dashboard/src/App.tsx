@@ -35,49 +35,7 @@ import { ScanResult, HistoryItem, QuizQuestion } from "./types";
 import WorldThreatMap from "./components/WorldThreatMap";
 import ThreatTrendChart from "./components/ThreatTrendChart";
 import { jsPDF } from "jspdf";
-
-const THREAT_DEFINITIONS: Record<string, { title: string; danger: string; explanation: string }> = {
-  "brand impersonation": {
-    title: "Brand Cloning / Impersonation",
-    danger: "Exploitation of Trust",
-    explanation: "Replicates authentic logos, colors, custom typography, and corporate design systems to make malicious payloads look legitimate."
-  },
-  "brand cloning": {
-    title: "Brand Cloning / Impersonation",
-    danger: "Exploitation of Trust",
-    explanation: "Replicates authentic logos, colors, custom typography, and corporate design systems to make malicious payloads look legitimate."
-  },
-  "credential harvesting": {
-    title: "Credential Harvesting Forms",
-    danger: "Account Takeover Hazard",
-    explanation: "Fraudulent forms, prompts, and fields engineered to capture passwords, MFA keys, or pins and save them directly to attacker log files."
-  },
-  "urgency": {
-    title: "Urgent Social Engineering Call to Action",
-    danger: "Psychological Manipulation",
-    explanation: "Enforces artificial deadlines or warnings ('Suspended in 2 hours') to trigger panic, causing users to bypass safety controls."
-  },
-  "social engineering": {
-    title: "Social Engineering Tactics",
-    danger: "High Human Deception Risk",
-    explanation: "Exploits standard behavior patterns, helpfulness, or fear of penalty or compliance notifications to procure user compliance."
-  },
-  "lookalike": {
-    title: "Lookalike / Typosquatted Domain",
-    danger: "Deceptive Spoofed Routing",
-    explanation: "Utilizes misleading domain spelling variants or deceptive subdomains (e.g. chase.com-security-server.top) to mimic trusted endpoints."
-  },
-  "phishing attachment": {
-    title: "Phishing Attachments & Exploits",
-    danger: "Device Compromise & Malware Risk",
-    explanation: "Disguises harmful payloads or visual links inside document attachment lookalikes to infect host computers with ransomware or hijackers."
-  },
-  "malicious attachment": {
-    title: "Phishing Attachments & Exploits",
-    danger: "Device Compromise & Malware Risk",
-    explanation: "Disguises harmful payloads or visual links inside document attachment lookalikes to infect host computers with ransomware or hijackers."
-  }
-};
+import { THREAT_DEFINITIONS, getRiskColor, getStatusColorClass, buildTargetDescription, computeQuizAnswer } from "./utils";
 
 export default function App() {
   // Navigation & configuration state
@@ -528,28 +486,7 @@ export default function App() {
     setScanError(null);
   };
 
-  // Helper colors based on risk severity
-  const getRiskColor = (risk: string) => {
-    switch (risk?.toLowerCase()) {
-      case "high":
-        return "text-red-500 bg-red-500/10 border-red-500/20";
-      case "medium":
-        return "text-amber-500 bg-amber-500/10 border-amber-500/20";
-      default:
-        return "text-emerald-500 bg-emerald-500/10 border-emerald-500/20";
-    }
-  };
 
-  const getStatusColorClass = (status: string) => {
-    switch (status) {
-      case "severe":
-        return "bg-red-500/15 border-red-500/30 text-red-400";
-      case "warning":
-        return "bg-amber-500/15 border-amber-500/30 text-amber-400";
-      default:
-        return "bg-emerald-500/15 border-emerald-500/30 text-emerald-400";
-    }
-  };
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-gray-200 font-sans antialiased flex flex-col selection:bg-cyan-500 selection:text-white" id="main-view-container">
