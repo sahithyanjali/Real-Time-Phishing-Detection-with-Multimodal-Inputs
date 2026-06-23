@@ -114,6 +114,11 @@ export default function App() {
     }
 
     try {
+      if (!result || !result.prediction) {
+        console.error("PDF download aborted: Invalid scan result data.");
+        setScanError("Cannot generate PDF report: scan result data is missing or invalid.");
+        return;
+      }
       const doc = new jsPDF();
       
       // Header brand box
@@ -266,8 +271,9 @@ export default function App() {
       doc.text("DO NOT SOLICIT PHISHING DIRECT LINK CLICKS WITH ACTIVE HARVESTING SIGNATURES.", 15, 291);
 
       doc.save(`cyber_shield_report_${Date.now()}.pdf`);
-    } catch (err) {
+    } catch (err: any) {
       console.error("PDF download failed:", err);
+      setScanError(`PDF report generation failed: ${err?.message || "Unknown error during PDF creation"}`);
     }
   };
 
@@ -284,30 +290,37 @@ export default function App() {
     try {
       const stored = localStorage.getItem("phish_scan_history");
       if (stored) {
-        setHistory(JSON.parse(stored));
-      } else {
-        // Hydrate with some mock scan items for gorgeous display
-        const initialHistory: HistoryItem[] = [
-          {
-            id: "hist-1",
-            timestamp: new Date(Date.now() - 3600000 * 4).toLocaleString(),
-            type: "url",
-            target: "http://secure-paypal-login.verify-account.info",
-            result: SCAN_PRESETS[0].mockOutput
-          },
-          {
-            id: "hist-2",
-            timestamp: new Date(Date.now() - 3600000 * 24).toLocaleString(),
-            type: "url",
-            target: "https://accounts.google.com/v3/signin",
-            result: SCAN_PRESETS[2].mockOutput
-          }
-        ];
-        setHistory(initialHistory);
-        localStorage.setItem("phish_scan_history", JSON.stringify(initialHistory));
+        const parsed = JSON.parse(stored);
+        if (!Array.isArray(parsed)) {
+          console.warn("LocalStorage scan history was corrupted (not an array). Resetting to defaults.");
+          localStorage.removeItem("phish_scan_history");
+        } else {
+          setHistory(parsed);
+          return;
+        }
       }
+      // Hydrate with some mock scan items for gorgeous display
+      const initialHistory: HistoryItem[] = [
+        {
+          id: "hist-1",
+          timestamp: new Date(Date.now() - 3600000 * 4).toLocaleString(),
+          type: "url",
+          target: "http://secure-paypal-login.verify-account.info",
+          result: SCAN_PRESETS[0].mockOutput
+        },
+        {
+          id: "hist-2",
+          timestamp: new Date(Date.now() - 3600000 * 24).toLocaleString(),
+          type: "url",
+          target: "https://accounts.google.com/v3/signin",
+          result: SCAN_PRESETS[2].mockOutput
+        }
+      ];
+      setHistory(initialHistory);
+      localStorage.setItem("phish_scan_history", JSON.stringify(initialHistory));
     } catch (e) {
       console.error("LocalStorage load error:", e);
+      setScanError("Failed to load scan history from local storage. History may be corrupted.");
     }
   }, []);
 
@@ -318,6 +331,7 @@ export default function App() {
       localStorage.setItem("phish_scan_history", JSON.stringify(items));
     } catch (e) {
       console.error("LocalStorage save error:", e);
+      setScanError("Failed to save scan history. Storage may be full or unavailable.");
     }
   };
 
@@ -333,6 +347,12 @@ export default function App() {
     const reader = new FileReader();
     reader.onload = (e) => {
       setImagePreview(e.target?.result as string);
+    };
+    reader.onerror = () => {
+      console.error("FileReader failed to read uploaded image:", reader.error);
+      setScanError(`Failed to read uploaded image: ${reader.error?.message || "Unknown read error"}`);
+      setImageFileName(null);
+      setImageMime(null);
     };
     reader.readAsDataURL(file);
   };
@@ -472,8 +492,17 @@ export default function App() {
         });
 
         if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData?.error || "Scanning failure on Express API endpoint.");
+          let errData: { error?: string; details?: string } = {};
+          try {
+            errData = await response.json();
+          } catch (jsonErr) {
+            console.warn("Failed to parse error response body as JSON:", jsonErr);
+          }
+          throw new Error(
+            errData?.details
+              ? `${errData.error}: ${errData.details}`
+              : errData?.error || `Scanning failed with HTTP status ${response.status}`
+          );
         }
 
         const data: ScanResult = await response.json();

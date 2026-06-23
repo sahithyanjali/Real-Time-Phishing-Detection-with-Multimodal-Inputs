@@ -287,7 +287,14 @@ async function startServer() {
         throw new Error("No response string received from the Gemini model.");
       }
 
-      const scanResult = JSON.parse(responseText.trim());
+      let scanResult;
+      try {
+        scanResult = JSON.parse(responseText.trim());
+      } catch (parseError: any) {
+        console.error("[AI Shield Scan] Failed to parse model response as JSON:", parseError.message);
+        console.error("[AI Shield Scan] Raw response text:", responseText.substring(0, 500));
+        throw new Error(`Model returned malformed JSON: ${parseError.message}`);
+      }
       res.json(scanResult);
 
     } catch (error: any) {
@@ -302,11 +309,16 @@ async function startServer() {
   // Handle Vite Asset Serving & Routing
   if (process.env.NODE_ENV !== "production") {
     console.log("Setting up Express dev server with Vite integration...");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
+    try {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } catch (viteError: any) {
+      console.error("[AI Shield Scan] Failed to initialize Vite dev server:", viteError.message);
+      throw new Error(`Vite server initialization failed: ${viteError.message}`);
+    }
   } else {
     console.log("Serving build artifact files from dist...");
     const distPath = path.join(process.cwd(), "dist");
@@ -321,4 +333,7 @@ async function startServer() {
   });
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error("[AI Shield Scan] Fatal: Server failed to start:", err.message || err);
+  process.exit(1);
+});
