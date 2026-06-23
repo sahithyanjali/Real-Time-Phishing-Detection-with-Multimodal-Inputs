@@ -2,6 +2,9 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
+import helmet from "helmet";
+import cors from "cors";
+import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -133,13 +136,36 @@ async function generateWithRetryAndFallback(ai: GoogleGenAI, contents: any, conf
 
 async function startServer() {
   const app = express();
-  
+
+  // Security headers
+  app.use(helmet({
+    contentSecurityPolicy: process.env.NODE_ENV === "production" ? undefined : false,
+  }));
+
+  // CORS: restrict to same-origin in production, allow localhost in dev
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(",")
+    : [`http://localhost:${PORT}`];
+  app.use(cors({
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+  }));
+
+  // Rate limiting on the scan API
+  const scanLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many scan requests. Please try again later." },
+  });
+
   // Support base64 email, screenshots, URLs
   app.use(express.json({ limit: "15mb" }));
   app.use(express.urlencoded({ limit: "15mb", extended: true }));
 
   // API router configuration
-  app.post("/api/scan", async (req, res) => {
+  app.post("/api/scan", scanLimiter, async (req, res) => {
     try {
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
@@ -150,8 +176,30 @@ async function startServer() {
 
       const { type, url, emailText, imageData, mimeType } = req.body;
 
-      if (!type) {
+      if (!type || typeof type !== "string") {
         return res.status(400).json({ error: "Scan type is required." });
+      }
+
+      const VALID_SCAN_TYPES = ["url", "email", "image", "combined"];
+      if (!VALID_SCAN_TYPES.includes(type)) {
+        return res.status(400).json({ error: "Invalid scan type." });
+      }
+
+      if (url && (typeof url !== "string" || url.length > 2048)) {
+        return res.status(400).json({ error: "URL must be a string under 2048 characters." });
+      }
+
+      if (emailText && (typeof emailText !== "string" || emailText.length > 50000)) {
+        return res.status(400).json({ error: "Email text must be a string under 50,000 characters." });
+      }
+
+      if (imageData && (typeof imageData !== "string" || imageData.length > 10_000_000)) {
+        return res.status(400).json({ error: "Image data must be a base64 string under 10MB." });
+      }
+
+      const VALID_MIME_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+      if (mimeType && (typeof mimeType !== "string" || !VALID_MIME_TYPES.includes(mimeType))) {
+        return res.status(400).json({ error: "Invalid image MIME type." });
       }
 
       // Lazy load Gemini SDK
@@ -293,8 +341,7 @@ async function startServer() {
     } catch (error: any) {
       console.error("Scanning process error:", error);
       res.status(500).json({
-        error: "Threat evaluation failed",
-        details: error?.message || "An unexpected error occurred during model analysis."
+        error: "Threat evaluation failed. Please try again later."
       });
     }
   });
