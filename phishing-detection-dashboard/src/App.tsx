@@ -35,6 +35,9 @@ import { ScanResult, HistoryItem, QuizQuestion } from "./types";
 import WorldThreatMap from "./components/WorldThreatMap";
 import ThreatTrendChart from "./components/ThreatTrendChart";
 import { jsPDF } from "jspdf";
+import { getRiskColor, getPredictionBgClass, getPredictionBadgeClass, getPredictionStrokeColor, getRiskBadgeClass } from "./utils/colors";
+import { createHistoryItem, getThreatSeverityScore } from "./utils/scanHelpers";
+import { TAB_TRANSITION } from "./utils/animations";
 
 const THREAT_DEFINITIONS: Record<string, { title: string; danger: string; explanation: string }> = {
   "brand impersonation": {
@@ -427,14 +430,7 @@ export default function App() {
         setScanResult(selectedMockResult);
 
         // Add to history
-        const newHistoryItem: HistoryItem = {
-          id: `hist-${Date.now()}`,
-          timestamp: new Date().toLocaleString(),
-          type: scanType,
-          target: targetText,
-          result: selectedMockResult
-        };
-        saveHistory([newHistoryItem, ...history]);
+        saveHistory([createHistoryItem(scanType, targetText, selectedMockResult), ...history]);
       } else {
         // Raw server fetch integration
         let targetText = "";
@@ -480,14 +476,7 @@ export default function App() {
         setScanResult(data);
 
         // Add to history
-        const newHistoryItem: HistoryItem = {
-          id: `hist-${Date.now()}`,
-          timestamp: new Date().toLocaleString(),
-          type: scanType,
-          target: targetText,
-          result: data
-        };
-        saveHistory([newHistoryItem, ...history]);
+        saveHistory([createHistoryItem(scanType, targetText, data), ...history]);
       }
     } catch (err: any) {
       console.error(err);
@@ -528,28 +517,7 @@ export default function App() {
     setScanError(null);
   };
 
-  // Helper colors based on risk severity
-  const getRiskColor = (risk: string) => {
-    switch (risk?.toLowerCase()) {
-      case "high":
-        return "text-red-500 bg-red-500/10 border-red-500/20";
-      case "medium":
-        return "text-amber-500 bg-amber-500/10 border-amber-500/20";
-      default:
-        return "text-emerald-500 bg-emerald-500/10 border-emerald-500/20";
-    }
-  };
 
-  const getStatusColorClass = (status: string) => {
-    switch (status) {
-      case "severe":
-        return "bg-red-500/15 border-red-500/30 text-red-400";
-      case "warning":
-        return "bg-amber-500/15 border-amber-500/30 text-amber-400";
-      default:
-        return "bg-emerald-500/15 border-emerald-500/30 text-emerald-400";
-    }
-  };
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-gray-200 font-sans antialiased flex flex-col selection:bg-cyan-500 selection:text-white" id="main-view-container">
@@ -630,9 +598,7 @@ export default function App() {
           {activeTab === "landing" && (
             <motion.div 
               key="landing-tab"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
+              {...TAB_TRANSITION}
               className="space-y-12"
             >
               {/* Hero Banner section */}
@@ -766,9 +732,7 @@ export default function App() {
           {activeTab === "scanner" && (
             <motion.div 
               key="scanner-tab"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
+              {...TAB_TRANSITION}
               className="grid grid-cols-1 lg:grid-cols-12 gap-8"
             >
               {/* Left Panel: Input controls */}
@@ -1040,10 +1004,7 @@ export default function App() {
                     className="bg-[#101726] border border-[#1b253b] rounded-2xl overflow-hidden"
                   >
                     {/* Header Alert area */}
-                    <div className={`p-5 border-b border-[#1b253b] flex items-center justify-between gap-3 ${
-                      scanResult.prediction === "Phishing" ? "bg-red-500/10" :
-                      scanResult.prediction === "Suspicious" ? "bg-amber-500/10" : "bg-emerald-500/10"
-                    }`}>
+                    <div className={`p-5 border-b border-[#1b253b] flex items-center justify-between gap-3 ${getPredictionBgClass(scanResult.prediction)}`}>
                       <div className="flex items-center gap-2.5">
                         {scanResult.prediction === "Phishing" ? (
                           <AlertOctagon className="h-5 w-5 text-red-500" />
@@ -1099,19 +1060,12 @@ export default function App() {
                               cy="30"
                               r="24"
                               fill="none"
-                              stroke={
-                                scanResult.prediction === "Phishing" ? "#ef4444" :
-                                scanResult.prediction === "Suspicious" ? "#f59e0b" : "#10b981"
-                              }
+                              stroke={getPredictionStrokeColor(scanResult.prediction)}
                               strokeWidth="4.5"
                               strokeDasharray="150.8"
                               initial={{ strokeDashoffset: 150.8 }}
                               animate={{ 
-                                strokeDashoffset: 150.8 - (
-                                  (scanResult.prediction === "Phishing" ? (55 + scanResult.confidence * 45) : 
-                                   scanResult.prediction === "Suspicious" ? (35 + scanResult.confidence * 35) : 
-                                   (5 + scanResult.confidence * 25)) / 100
-                                ) * 150.8 
+                                strokeDashoffset: 150.8 - (getThreatSeverityScore(scanResult.prediction, scanResult.confidence) / 100) * 150.8 
                               }}
                               transition={{ duration: 1.2, ease: "easeOut" }}
                               strokeLinecap="round"
@@ -1120,11 +1074,7 @@ export default function App() {
                           {/* Inside absolute labels */}
                           <div className="absolute inset-0 flex flex-col items-center justify-center">
                             <span className="text-sm font-extrabold text-white leading-none font-mono">
-                              {Math.round(
-                                scanResult.prediction === "Phishing" ? (55 + scanResult.confidence * 45) : 
-                                scanResult.prediction === "Suspicious" ? (35 + scanResult.confidence * 35) : 
-                                (5 + scanResult.confidence * 25)
-                              )}%
+                              {Math.round(getThreatSeverityScore(scanResult.prediction, scanResult.confidence))}%
                             </span>
                             <span className="text-[8px] text-gray-400 font-sans mt-0.5 uppercase tracking-wider font-semibold">Score</span>
                           </div>
@@ -1260,9 +1210,7 @@ export default function App() {
           {activeTab === "analytics" && (
             <motion.div 
               key="analytics-tab"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
+              {...TAB_TRANSITION}
               className="space-y-8"
             >
               {/* Real-time interactive global map */}
@@ -1363,11 +1311,7 @@ export default function App() {
                             </td>
                             <td className="p-4 font-medium text-white max-w-[280px] truncate">{item.target}</td>
                             <td className="p-4 text-center">
-                              <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
-                                item.result.prediction === 'Phishing' ? 'bg-red-500/15 text-red-400 border border-red-500/20' :
-                                item.result.prediction === 'Suspicious' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' :
-                                'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
-                              }`}>
+                              <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${getPredictionBadgeClass(item.result.prediction)}`}>
                                 {item.result.prediction}
                               </span>
                             </td>
@@ -1375,11 +1319,7 @@ export default function App() {
                               {(item.result.confidence * 100).toFixed(0)}%
                             </td>
                             <td className="p-4 text-right">
-                              <span className={`px-2.5 py-0.5 rounded text-[10px] uppercase font-bold ${
-                                item.result.riskLevel === 'High' ? 'text-red-400 bg-red-500/10' :
-                                item.result.riskLevel === 'Medium' ? 'text-amber-400 bg-amber-500/10' :
-                                'text-emerald-400 bg-emerald-500/10'
-                              }`}>
+                              <span className={`px-2.5 py-0.5 rounded text-[10px] uppercase font-bold ${getRiskBadgeClass(item.result.riskLevel)}`}>
                                 {item.result.riskLevel}
                               </span>
                             </td>
@@ -1397,9 +1337,7 @@ export default function App() {
           {activeTab === "simulator" && (
             <motion.div 
               key="simulator-tab"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
+              {...TAB_TRANSITION}
               className="space-y-8"
             >
               {/* Top description card */}

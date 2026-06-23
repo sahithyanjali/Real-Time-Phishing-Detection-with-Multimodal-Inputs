@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Globe, ShieldAlert, Wifi, Activity, Terminal, Flame, Info, Filter } from "lucide-react";
+import { getLogRiskClass } from "../utils/colors";
 
 interface ThreatPoint {
   id: string;
@@ -424,10 +425,7 @@ export default function WorldThreatMap() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-indigo-400 font-semibold">{log.time}</span>
-                      <span className={`px-1.5 py-0.2 rounded font-extrabold uppercase text-[8px] ${
-                        log.risk === 'Critical' ? 'bg-red-500/15 text-red-400' :
-                        log.risk === 'High' ? 'bg-amber-500/15 text-amber-400' : 'bg-yellow-500/15 text-yellow-500'
-                      }`}>
+                      <span className={`px-1.5 py-0.2 rounded font-extrabold uppercase text-[8px] ${getLogRiskClass(log.risk)}`}>
                         {log.risk}
                       </span>
                     </div>
