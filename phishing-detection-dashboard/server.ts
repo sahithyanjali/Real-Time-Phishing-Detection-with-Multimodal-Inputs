@@ -3,6 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
+import { cleanBase64Image } from "./src/utils/scanHelpers";
 
 dotenv.config();
 
@@ -181,12 +182,10 @@ async function startServer() {
       } else if (type === "image" && imageData) {
         const mimeStr = mimeType || "image/png";
         // Strip data prefix if present
-        const cleanBase64 = imageData.replace(/^data:image\/\w+;base64,/, "");
-        
         parts.push({
           inlineData: {
             mimeType: mimeStr,
-            data: cleanBase64
+            data: cleanBase64Image(imageData)
           }
         });
         parts.push({
@@ -202,11 +201,10 @@ async function startServer() {
 
         if (imageData) {
           const mimeStr = mimeType || "image/png";
-          const cleanBase64 = imageData.replace(/^data:image\/\w+;base64,/, "");
           parts.push({
             inlineData: {
               mimeType: mimeStr,
-              data: cleanBase64
+              data: cleanBase64Image(imageData)
             }
           });
           parts.push({ text: "Examine this accompanying screenshot for lookalike elements matching the provided URL and email text." });
